@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz Platform – MedLab Week 2026</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Firebase compat CDN (works directly in browser, no bundler needed) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  <!-- Quiz support libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <script src="https://unpkg.com/mammoth/mammoth.browser.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div id="emoji-layer" aria-hidden="true"></div>
+
+  <!-- Loading overlay (shown during Firestore operations) -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-box">
+      <div class="loading-spinner"></div>
+      <p class="loading-msg">Loading…</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ LOGIN SCREEN ═══════════════════ -->
+  <section id="login-screen" class="full-page-center">
+    <div class="login-box">
+      <header class="login-header">
+        <img src="C:\Users\dhars\OneDrive\Desktop\new quiz\picture\images1.png" class="login-logo left-logo" alt="VMRF-DU Logo">
+        <img src="C:\Users\dhars\OneDrive\Desktop\new quiz\picture\images2.png" class="login-logo right-logo" alt="IFCC MedLab Logo">
+        <h1>Medical Laboratory Week 2026</h1>
+        <p class="tagline">We are one – silently behind every diagnosis and successful treatment.</p>
+      </header>
+
+      <div class="login-card">
+        <h2>Sign In</h2>
+        <label>
+          Username
+          <input id="login-username" type="text" placeholder="Enter username" autocomplete="username">
+        </label>
+        <label>
+          Password
+          <input id="login-password" type="password" placeholder="Enter password" autocomplete="current-password">
+        </label>
+        <p id="login-error" class="error-text hidden"></p>
+        <button id="login-btn" type="button">Sign In</button>
+        <p class="login-hint">Guests can <button id="guest-play-btn" type="button" class="link-btn">Play Quiz →</button></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ ADMIN SCREEN ═══════════════════ -->
+  <section id="admin-screen" class="layout hidden">
+    <div class="admin-wrapper">
+      <header class="app-header">
+        <img src="C:\Users\dhars\OneDrive\Desktop\new quiz\picture\images1.png" class="corner-pic left" alt="Left Logo">
+        <img src="C:\Users\dhars\OneDrive\Desktop\new quiz\picture\images2.png" class="corner-pic right" alt="Right Logo">
+        <h1>Admin Panel</h1>
+        <p>Medical Laboratory Week 2026</p>
+      </header>
+
+      <div class="admin-toolbar">
+        <span class="admin-badge">👑 ADMIN</span>
+        <div class="admin-toolbar-actions">
+          <button id="admin-go-home-btn" type="button" class="secondary-btn">Go to Quiz Home</button>
+          <button id="admin-logout-btn" type="button" class="ghost-btn">Logout</button>
+        </div>
+      </div>
+
+      <div class="admin-grid">
+        <!-- Create Creator -->
+        <div class="panel">
+          <h2>Create Creator Account</h2>
+          <div class="card">
+            <label>
+              Username
+              <input id="new-creator-username" type="text" placeholder="e.g. creator01">
+            </label>
+            <label>
+              Password
+              <input id="new-creator-password" type="password" placeholder="Min 6 characters">
+            </label>
+            <label>
+              Display Name (optional)
+              <input id="new-creator-name" type="text" placeholder="e.g. Dr. Smith">
+            </label>
+            <button id="create-creator-btn" type="button">Create Account</button>
+            <p id="create-status" class="status-text"></p>
+          </div>
+        </div>
+
+        <!-- Creator List -->
+        <div class="panel">
+          <div class="panel-title-row">
+            <h2>Creator Accounts</h2>
+            <span id="creator-count-badge" class="quiz-count-badge-pill">0 creators</span>
+          </div>
+          <div class="card">
+            <ul id="creator-list" class="creator-list">
+              <li class="empty-state">No creator accounts yet.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ MAIN APP ═══════════════════ -->
+  <div id="app-wrapper" class="hidden">
+    <header class="app-header">
+      <img src="C:\Users\dhars\OneDrive\Desktop\new quiz\picture\images1.png" class="corner-pic left" alt="Left Logo">
+      <img src="C:\Users\dhars\OneDrive\Desktop\new quiz\picture\images2.png" class="corner-pic right" alt="Right Logo">
+      <h1>Medical Laboratory Week 2026</h1>
+      <p>We are one – silently behind every diagnosis and successful treatment.</p>
+    </header>
+
+    <!-- Session bar -->
+    <div id="session-bar" class="session-bar hidden">
+      <span id="session-user-label"></span>
+      <button id="nav-logout-btn" type="button" class="ghost-btn sm-btn">Logout</button>
+    </div>
+
+    <main>
+      <!-- HOME SCREEN -->
+      <section id="home-screen" class="layout single-center">
+        <div class="panel home-panel">
+          <h2>Choose an Option</h2>
+          <p class="helper-text">Start by creating a quiz, or directly play the saved quiz.</p>
+          <div id="home-make-quiz-row" class="home-actions hidden">
+            <button id="go-maker-btn" type="button">Make Quiz</button>
+            <button id="go-player-btn" type="button">Play Quiz</button>
+          </div>
+          <div id="home-play-only-row" class="home-actions hidden">
+            <button id="go-player-only-btn" type="button">Play Quiz</button>
+          </div>
+          <div class="home-actions single-action" style="margin-top:0.5rem">
+            <button id="go-picture-player-btn" type="button" class="secondary-btn">Play Picture Connection Game</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- MAKER SCREEN -->
+      <section id="maker-screen" class="layout hidden">
+        <section class="panel">
+          <div class="panel-title-row">
+            <h2>Quiz Title</h2>
+            <button id="back-home-from-maker" type="button" class="ghost-btn">Back</button>
+          </div>
+          <div class="card">
+            <div class="quiz-switch-row">
+              <label>
+                Select Quiz
+                <select id="quiz-select"></select>
+              </label>
+              <div class="quiz-actions">
+                <button id="add-new-quiz-btn" type="button" class="secondary-btn">Add New Quiz</button>
+                <button id="delete-quiz-btn" type="button" class="ghost-btn">Delete Quiz</button>
+              </div>
+            </div>
+            <label>
+              Title
+              <input id="quiz-title-input" type="text" placeholder="Enter quiz title">
+            </label>
+            <label>
+              Timer Per Question (seconds)
+              <input id="timer-seconds-input" type="number" min="5" max="120" step="1" value="20">
+            </label>
+            <label>
+              Play Background Image
+              <input id="background-image-input" type="file" accept="image/*">
+            </label>
+            <button id="clear-background-btn" type="button" class="secondary-btn">Remove Background Image</button>
+            <button id="save-title-btn" type="button">Save Title</button>
+            <p id="title-status" class="status-text"></p>
+          </div>
+        </section>
+
+        <section id="player-panel" class="panel">
+          <div class="panel-title-row">
+            <h2>Quiz Maker</h2>
+            <span id="quiz-count-badge">0 questions</span>
+          </div>
+
+          <div class="card">
+            <h3>Upload Quiz File</h3>
+            <p class="helper-text">
+              Supports <strong>.xlsx/.xls</strong> and <strong>.docx</strong>.
+              Excel format: columns like Question, Option1-4, Answer.
+              Word format examples: <code>Q:</code>, <code>1.</code>, <code>A)</code>, <code>Answer:</code>
+            </p>
+            <div class="upload-row">
+              <input id="quiz-file-input" type="file" accept=".xlsx,.xls,.docx">
+              <button id="upload-btn" type="button">Import Questions</button>
+            </div>
+            <div class="download-format-row">
+              <button id="download-excel-format-btn" type="button" class="secondary-btn">Download Excel Format</button>
+              <button id="download-word-format-btn" type="button" class="secondary-btn">Download Word Format</button>
+            </div>
+            <p id="upload-status" class="status-text"></p>
+          </div>
+
+          <div class="card">
+            <h3>Add Question Manually</h3>
+            <form id="question-form">
+              <label>
+                Question
+                <textarea id="question-text" required placeholder="Enter your question"></textarea>
+              </label>
+              <div class="options-grid">
+                <label>Option A <input id="opt-a" type="text" required></label>
+                <label>Option B <input id="opt-b" type="text" required></label>
+                <label>Option C <input id="opt-c" type="text" required></label>
+                <label>Option D <input id="opt-d" type="text" required></label>
+              </div>
+              <label>
+                Correct Answer
+                <select id="correct-answer" required>
+                  <option value="0">Option A</option>
+                  <option value="1">Option B</option>
+                  <option value="2">Option C</option>
+                  <option value="3">Option D</option>
+                </select>
+              </label>
+              <button type="submit">Add Question</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="panel-title-row">
+              <h3>Question List</h3>
+              <button id="clear-quiz-btn" type="button" class="ghost-btn">Clear All</button>
+            </div>
+            <ul id="question-list"></ul>
+          </div>
+
+          <div class="card">
+            <div class="panel-title-row">
+              <h3>Picture Connection Maker</h3>
+              <button id="clear-picture-btn" type="button" class="ghost-btn">Clear Picture Game</button>
+            </div>
+            <form id="picture-form">
+              <label>
+                Upload Multiple Images
+                <input id="picture-images-input" type="file" accept="image/*" multiple>
+              </label>
+              <label>
+                Or Paste Image URL(s)
+                <textarea id="picture-urls-input" placeholder="https://example.com/pic1.jpg&#10;https://example.com/pic2.png"></textarea>
+              </label>
+              <label>
+                Correct Word Answer
+                <input id="picture-answer-input" type="text" placeholder="e.g. Rainbow" required>
+              </label>
+              <button type="submit">Add Picture Connection</button>
+            </form>
+            <ul id="picture-list"></ul>
+          </div>
+        </section>
+      </section>
+
+      <!-- PLAYER SCREEN -->
+      <section id="player-screen" class="layout hidden">
+        <section class="panel">
+          <div class="panel-title-row">
+            <h2 id="play-quiz-title">Play Quiz</h2>
+            <button id="back-home-from-player" type="button" class="ghost-btn">Back</button>
+          </div>
+          <div class="card">
+            <label>
+              Select Quiz to Play
+              <select id="play-quiz-select"></select>
+            </label>
+          </div>
+          <div class="play-mode-row">
+            <button id="start-quiz-btn" type="button">Start Quiz</button>
+            <button id="start-picture-game-btn" type="button" class="secondary-btn">Start Picture Connection Game</button>
+          </div>
+
+          <div id="quiz-player" class="card hidden">
+            <div class="progress-row">
+              <span id="progress-label">Question 1 / 1</span>
+              <span id="score-label">Score: 0</span>
+              <span id="timer-label">Time: 20s</span>
+            </div>
+            <h3 id="play-question"></h3>
+            <div id="play-options" class="play-options"></div>
+            <p id="answer-feedback" class="feedback"></p>
+            <button id="next-btn" type="button" class="hidden">Next Question</button>
+          </div>
+
+          <div id="picture-player" class="card hidden">
+            <div class="progress-row">
+              <span id="picture-progress-label">Round 1 / 1</span>
+              <span id="picture-score-label">Score: 0</span>
+              <span id="picture-timer-label">Time: 20s</span>
+            </div>
+            <h3>Identify the word from pictures</h3>
+            <div id="picture-images-grid" class="picture-images-grid"></div>
+            <label>
+              Your Answer
+              <input id="picture-answer-play-input" type="text" placeholder="Type answer">
+            </label>
+            <p id="picture-feedback" class="feedback"></p>
+            <button id="picture-submit-btn" type="button">Submit Answer</button>
+            <button id="picture-next-btn" type="button" class="hidden">Next Round</button>
+          </div>
+
+          <div id="quiz-summary" class="card hidden">
+            <h3>Quiz Completed!</h3>
+            <p id="summary-text"></p>
+            <button id="restart-btn" type="button">Play Again</button>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
